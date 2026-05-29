@@ -28,7 +28,7 @@ Kuidas saab tootmisettevõte avalike andmete põhjal varakult märgata, kui mõn
 | Äriregistri majandusaasta aruannete EMTAK/müügitulu andmed | Avaandmete fail | Perioodiline | Kasutame tarnijakandidaatide valikul EMTAK koodi ja müügitulu järgi |
 | Tarnijate nimekiri | CSV seed | Staatiline näidisfail | Määrab, milliseid tarnijaid dashboard jälgib |
 
-Tarnijate nimekiri koostatakse avalike Eesti ettevõtete põhjal. Valiku aluseks on EMTAK kood ja käibe või müügitulu tase. Projekti praegune ulatus on Eesti Äriregistris olevad juriidilised isikud.
+Tarnijate nimekiri koostatakse avalike Eesti ettevõtete põhjal. Valiku aluseks on EMTAK kood ja käibe või müügitulu tase. Projekti praegune skoob on Eesti Äriregistris olevad juriidilised isikud.
 
 ## Andmeallikate esmane tehniline kontroll
 
@@ -62,7 +62,7 @@ flowchart LR
     marts --> dashboard[Streamlit dashboard]
 ```
 
-Arenduse ajal saab töövoogu käivitada käsitsi, näiteks `make run-pipeline` käsuga. Lõppversioonis on plaanis lisada lihtne scheduler, mis käivitab põhitöövoo kord päevas. Airflow'd esimeses versioonis ei kasuta liigse keerukuse ja töömahu vältimiseks.
+Arenduse ajal saab töövoogu käivitada käsitsi, näiteks `make run-pipeline` käsuga. Lõppversioonis on plaanis lisada lihtne scheduler, mis käivitab põhitöövoo kord päevas. Airflow'd esimeses versioonis ei kasuta, sest üksinda tehes oleks see liiga suur lisakeerukus.
 
 Andmeid ei ole mõtet tõmmata tihemini kui allikas muutub. Seetõttu on põhirütm üks kord päevas. Kvartaalseid käibeandmeid võib kontrollida samas töövoos, aga neid ei pea iga päev sisuliselt ümber arvutama, kui fail ei ole muutunud.
 
@@ -88,11 +88,13 @@ Reeglid:
 - väärtus teisendatakse suurtähtedeks;
 - tarnijate tabelis kasutame ainult Eesti Äriregistri 8-kohalisi numbrilisi registrikoode.
 
+Põhjus on lihtne: registrikood on ühendamise võti. Kui üks fail sisaldab väärtust `12345678` ja teine `12345678 `, siis arvuti jaoks võivad need olla erinevad väärtused. Tekstina lugemine väldib ka olukorda, kus mõni identifikaator muutub importimisel valeks arvuks.
+
 MTA failis esinevad mittestandardsed või mitteresidendi koodid jäävad raw-kihti alles. Riskiskoori arvutuses neid praeguses projektis ei kasutata, sest tarnijate nimekiri põhineb Eesti Äriregistri ettevõtetel.
 
 ## Riskiskoori algloogika
 
-Riskiskoor on reeglipõhine. See tähendab, et iga riskisignaal annab kindla arvu punkte.
+Riskiskoor on reeglipõhine. See tähendab, et iga riskisignaal annab kindla arvu punkte. Selline lahendus on kaitsmisel lihtsamini seletatav kui masinõppemudel.
 
 Esialgne loogika:
 
@@ -146,10 +148,12 @@ Projekt tehakse individuaalselt. Sama inimene täidab mitu rolli.
 
 | Risk | Mõju | Maandus |
 |---|---|---|
-| Avaliku faili link või struktuur muutub (sh. zip faili sisu) | Pipeline ei saa andmeid alla laadida või lugeda | URL-id pannakse `.env` faili ja lisatakse allika kontrollskript |
+| Avaliku faili link või struktuur muutub | Pipeline ei saa andmeid alla laadida või lugeda | URL-id pannakse `.env` faili ja lisatakse allika kontrollskript |
+| Äriregistri ZIP-faili sees olev CSV muutub | Lahtipakkimise või lugemise samm võib katki minna | Skript kontrollib ZIP-i sisu enne lugemist |
 | Registrikoodid ei sobitu eri allikates | Tarnija risk võib jääda valesti arvutamata | Registrikoodid standardiseeritakse staging-kihis ja kasutatakse kontrollteste |
 | Tarnijate nimekiri on liiga ühekülgne | Dashboard ei näita sisulist väärtust | Valin tarnijaid eri olukordadest: maksuvõlaga, võlata, erineva käibe ja staatusega |
 | Käibe/müügitulu andmed uuenevad harvem kui maksuvõlad | Käibesignaal ei pruugi iga päev muutuda | Dashboardil kuvatakse andmete seis ja kasutatakse viimast teadaolevat väärtust |
+| Projekt läheb üksinda tehes liiga suureks | Lõpplahendus võib jääda poolikuks | Esimene versioon tehakse ilma Airflow ja Supersetita; fookus on töötaval põhivoogul |
 
 ## Privaatsus ja turve
 
@@ -158,6 +162,7 @@ Projekt kasutab avalikke andmeallikaid ja avalike ettevõtete põhjal koostatud 
 - Andmebaasi kasutaja, paroolid ja URL-id hoitakse lokaalses `.env` failis.
 - Repos on ainult `.env.example`.
 - Toorandmefaile GitHubi ei lisata; need laaditakse skriptiga alla.
+- Tööandja konfidentsiaalseid tarnijaandmeid ei kasutata.
 - Dashboard ei kuva isikuandmeid. Fookus on juriidilistel isikutel ja avalikel ettevõtteandmetel.
 
 ## Lahtised küsimused

@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+
+.env
+
+data/raw/*
+data/processed/*
+logs/*
+
+.vscode
+.idea
+.DS_Store

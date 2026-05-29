@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+
+# Local data files
+data/raw/*
+data/processed/*
+logs/*
+
+# Keep folders visible in GitHub
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!logs/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# dbt generated files
+dbt_project/target/
+dbt_project/logs/
+dbt_project/.user.yml
