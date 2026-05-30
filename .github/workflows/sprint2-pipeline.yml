@@ -1,0 +1,100 @@
+name: Sprint 2 pipeline check
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  pipeline-check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: supplier_risk
+          POSTGRES_USER: supplier_user
+          POSTGRES_PASSWORD: supplier_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U supplier_user -d supplier_risk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_DB: supplier_risk
+      POSTGRES_USER: supplier_user
+      POSTGRES_PASSWORD: supplier_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      MTA_TAX_DEBTS_URL: https://ncfailid.emta.ee/s/XKJLjtynFeYdGyC/download/maksuvolglaste_nimekiri.csv
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create .env file
+        run: |
+          cat > .env <<EOF_ENV
+          POSTGRES_DB=$POSTGRES_DB
+          POSTGRES_USER=$POSTGRES_USER
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          POSTGRES_HOST=$POSTGRES_HOST
+          POSTGRES_PORT=$POSTGRES_PORT
+          MTA_TAX_DEBTS_URL=$MTA_TAX_DEBTS_URL
+          EOF_ENV
+
+      - name: Download MTA tax debts
+        run: python scripts/download_mta_tax_debts.py
+
+      - name: Load raw table
+        run: python scripts/load_mta_tax_debts_raw.py
+
+      - name: Run dbt models
+        run: dbt run --project-dir dbt_project --profiles-dir dbt_project
+
+      - name: Check mart table
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from dotenv import load_dotenv
+          from sqlalchemy import create_engine, text
+
+          load_dotenv(dotenv_path=Path(".env"))
+
+          engine = create_engine(
+              "postgresql+psycopg2://"
+              f"{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
+              f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
+          )
+
+          with engine.connect() as conn:
+              row = conn.execute(text("""
+                  select
+                      tax_debtor_count,
+                      total_tax_debt_amount
+                  from mart_tax_debt_summary
+              """)).one()
+
+          print("tax_debtor_count:", row.tax_debtor_count)
+          print("total_tax_debt_amount:", row.total_tax_debt_amount)
+
+          assert row.tax_debtor_count > 0
+          assert row.total_tax_debt_amount > 0
+          PY
